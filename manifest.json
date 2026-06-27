@@ -1,0 +1,17 @@
+{
+  "name": "SolarAlert — Alerta de Radiación Solar",
+  "short_name": "SolarAlert",
+  "description": "App de alerta de radiación solar en tiempo real",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FF6B00",
+  "theme_color": "#FF6B00",
+  "lang": "es",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["health", "weather", "lifestyle"],
+  "screenshots": []
+}
