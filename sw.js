@@ -2,8 +2,8 @@ const CACHE = 'solaralert-v1';
 const ASSETS = [
   './',
   './index.html',
-  './css/app.css',
-  './js/app.js',
+  './app.css',
+  './app.js',
   './manifest.json'
 ];
 
@@ -22,5 +22,15 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   e.respondWith(
     fetch(e.request).catch(() => caches.match(e.request))
+  );
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({type:'window'}).then(list => {
+      if (list.length > 0) return list[0].focus();
+      return self.clients.openWindow('./');
+    })
   );
 });
