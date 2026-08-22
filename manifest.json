@@ -13,5 +13,28 @@
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "categories": ["health", "weather", "lifestyle"],
-  "screenshots": []
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Ver UV ahora",
+      "short_name": "UV ahora",
+      "description": "Ir directo al índice UV actual",
+      "url": "./index.html?screen=home",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Comparar ciudades",
+      "short_name": "Comparar",
+      "description": "Comparar el UV entre varias ciudades",
+      "url": "./index.html?screen=comparar",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Consejos de protección",
+      "short_name": "Consejos",
+      "description": "Ver recomendaciones de protección solar",
+      "url": "./index.html?screen=consejos",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

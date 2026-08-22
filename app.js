@@ -19,7 +19,10 @@ const state = {
   air: null,
   community: [],
   reminders: [],
-  lastReminderMinute: null
+  lastReminderMinute: null,
+  compareCities: [],
+  emergencyPhone: '',
+  kidsMode: false
 };
 
 const WIND_TAG = ['N','NE','E','SE','S','SO','O','NO'];
@@ -86,6 +89,8 @@ function initApp() {
   applyTheme(state.theme, false);
   applyFontSize(state.fontSize, false);
   applyAccent(state.accent, state.accentGrad, false);
+  const ephone = document.getElementById('emergency-phone');
+  if (ephone && state.emergencyPhone) ephone.value = state.emergencyPhone;
   updateNotifStatus();
   setupKeyboardActivation();
   getLocation();
@@ -99,6 +104,16 @@ function initApp() {
   setInterval(checkDailySummary, 60000);
   setInterval(checkReminders, 60000);
   checkReminders();
+  renderCompareList();
+  applyKidsMode(state.kidsMode, false);
+  handleShortcutParam();
+}
+
+/* ── Accesos directos (manifest shortcuts) ── */
+function handleShortcutParam() {
+  const params = new URLSearchParams(window.location.search);
+  const target = params.get('screen');
+  if (target) setTimeout(() => goTo(target), 300);
 }
 
 /* ── ACCESIBILIDAD: activar role="button"/radio/switch con teclado ── */
@@ -243,6 +258,9 @@ function renderAll() {
   renderSky();
   renderActivities();
   renderStats();
+  checkEmergencyCard();
+  renderKidsBanner();
+  document.body.classList.toggle('night-mode', isNightNow());
 }
 
 function renderAlertBar() {
@@ -449,15 +467,20 @@ function renderSky() {
   if (!el) return;
   const clouds = state.clouds ?? 0;
   document.getElementById('sky-clouds').textContent = clouds + '%';
-  const now = new Date();
-  const isNight = state.sunrise && state.sunset && (now.toLocaleTimeString('es-PE',{hour12:false}) < state.sunrise || now.toLocaleTimeString('es-PE',{hour12:false}) > state.sunset);
+  const isNight = isNightNow();
   document.getElementById('sky-body').textContent = isNight ? '🌙' : '☀️';
+  document.getElementById('sky-view').classList.toggle('is-night', isNight);
   document.querySelectorAll('.sky-cloud').forEach((c,i)=>{
     c.style.opacity = clouds < 15 ? '0.15' : clouds < 50 ? '0.55' : '0.95';
   });
   document.getElementById('sky-hint').textContent = clouds < 15
     ? 'Cielo despejado — ideal para actividades al aire libre.'
     : clouds < 60 ? 'Parcialmente nublado.' : 'Cielo muy nublado en tu zona.';
+}
+function isNightNow() {
+  if (!state.sunrise || !state.sunset) return false;
+  const now = new Date().toLocaleTimeString('es-PE',{hour12:false});
+  return now < state.sunrise || now > state.sunset;
 }
 
 /* ══════════════ ACTIVIDADES (render) ══════════════ */
@@ -578,6 +601,179 @@ function renderStats() {
     <div class="stat-summary-row"><span>UV máximo registrado</span><span class="stat-summary-val">${maxUV}</span></div>
     <div class="stat-summary-row"><span>Alertas totales</span><span class="stat-summary-val">${state.alerts}</span></div>
     <div class="stat-summary-row"><span>Días activo en la app</span><span class="stat-summary-val">${state.days}</span></div>`;
+}
+
+/* ══════════════ PREMIUM (simulación para la presentación) ══════════════ */
+let selectedPlan = 'yearly';
+function selectPlan(plan) {
+  selectedPlan = plan;
+  document.getElementById('plan-monthly').classList.toggle('selected', plan==='monthly');
+  document.getElementById('plan-yearly').classList.toggle('selected', plan==='yearly');
+}
+function activatePremium() {
+  const label = selectedPlan === 'monthly' ? 'Mensual (S/ 4.90/mes)' : 'Anual (S/ 39.90/año)';
+  showToast('✨ Simulación: Premium ' + label + ' activado');
+}
+
+/* ══════════════ COMPARAR CIUDADES ══════════════ */
+async function searchCompareCity() {
+  const input = document.getElementById('compare-input');
+  const q = input.value.trim();
+  if (!q) return;
+  const box = document.getElementById('compare-suggestions');
+  box.innerHTML = '<p style="font-size:12px;color:var(--text3)">Buscando...</p>';
+  try {
+    const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=es&format=json`);
+    const d = await r.json();
+    const results = d.results || [];
+    if (!results.length) { box.innerHTML = '<p style="font-size:12px;color:var(--text3)">No se encontraron ciudades.</p>'; return; }
+    box.innerHTML = results.map((c,i)=>`
+      <div class="prow" onclick="addCompareCity(${c.latitude},${c.longitude},'${(c.name+(c.admin1?', '+c.admin1:'')+', '+c.country).replace(/'/g,"\\'")}')">
+        <div class="prow-icon" style="background:#E0F2F1">📍</div>
+        <div class="prow-label">${c.name}${c.admin1?', '+c.admin1:''}, ${c.country}</div>
+        <div class="prow-right">+</div>
+      </div>`).join('');
+  } catch(e) {
+    box.innerHTML = '<p style="font-size:12px;color:var(--text3)">⚠️ Error al buscar. Intenta de nuevo.</p>';
+  }
+}
+function addCompareCity(lat, lon, name) {
+  if (state.compareCities.some(c=>c.name===name)) { showToast('Esa ciudad ya está en tu lista'); return; }
+  if (state.compareCities.length >= 6) { showToast('Máximo 6 ciudades. Elimina una para agregar otra.'); return; }
+  state.compareCities.push({lat, lon, name});
+  document.getElementById('compare-input').value='';
+  document.getElementById('compare-suggestions').innerHTML='';
+  saveState();
+  renderCompareList();
+}
+function removeCompareCity(name) {
+  state.compareCities = state.compareCities.filter(c=>c.name!==name);
+  saveState(); renderCompareList();
+}
+async function renderCompareList() {
+  const el = document.getElementById('compare-list');
+  if (!el) return;
+  const mine = { name: `📍 ${state.city} (tú)`, uv: state.uv ?? 0, temp: state.temp ?? '--', mine:true };
+  if (!state.compareCities.length) {
+    el.innerHTML = renderCompareRow(mine) + '<div class="hist-empty">Busca y agrega ciudades arriba para compararlas.</div>';
+    return;
+  }
+  el.innerHTML = renderCompareRow(mine) + '<p style="font-size:11px;color:var(--text3);padding:8px 0 0;">Cargando otras ciudades...</p>';
+  try {
+    const results = await Promise.all(state.compareCities.map(c =>
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&current=temperature_2m&hourly=uv_index&forecast_days=1&timezone=auto`)
+        .then(r=>r.json())
+        .then(d=>({ name:c.name, uv: Math.round((d.hourly?.uv_index||[])[new Date().getHours()] ?? 0), temp: Math.round(d.current?.temperature_2m ?? 0) }))
+        .catch(()=>({ name:c.name, uv: 0, temp: '--' }))
+    ));
+    const all = [mine, ...results].sort((a,b)=>b.uv-a.uv);
+    el.innerHTML = all.map(renderCompareRow).join('');
+  } catch(e) {
+    el.innerHTML = renderCompareRow(mine) + '<div class="hist-empty">⚠️ No se pudieron cargar las demás ciudades.</div>';
+  }
+}
+function renderCompareRow(c) {
+  const color = uvCol(c.uv);
+  return `<div class="compare-row">
+    <div class="compare-city">${c.name}</div>
+    <div class="compare-uv" style="background:${color}22;color:${color}">UV ${c.uv}</div>
+    <div class="compare-temp">${c.temp}°</div>
+    ${c.mine ? '' : `<button class="reminder-del" onclick="removeCompareCity('${c.name.replace(/'/g,"\\'")}')" aria-label="Quitar">🗑</button>`}
+  </div>`;
+}
+
+/* ══════════════ ALERTA WHATSAPP A FAMILIAR ══════════════ */
+function saveEmergencyContact() {
+  state.emergencyPhone = document.getElementById('emergency-phone').value.replace(/\D/g,'');
+  saveState();
+  showToast('Contacto de emergencia guardado');
+}
+function checkEmergencyCard() {
+  const card = document.getElementById('emergency-card');
+  if (!card) return;
+  card.style.display = (state.uv >= 11) ? 'block' : 'none';
+}
+function sendWhatsAppAlert() {
+  if (!state.emergencyPhone) { showToast('Primero agrega un contacto en Ajustes'); goTo('ajustes'); return; }
+  const msg = `🚨 Alerta SolarAlert: el índice UV en ${state.city} está EXTREMO (UV ${state.uv}). Por favor toma precauciones si vas a salir.`;
+  window.open(`https://wa.me/${state.emergencyPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+/* ══════════════ COMPARTIR REPORTE ══════════════ */
+async function shareReport() {
+  const text = `☀️ SolarAlert — ${state.city}\nÍndice UV: ${state.uv ?? '--'}\nTemperatura: ${state.temp ?? '--'}°C\n¡Cuida tu piel del sol!`;
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Mi reporte SolarAlert', text }); }
+    catch(e) { /* usuario canceló */ }
+  } else {
+    try { await navigator.clipboard.writeText(text); showToast('📋 Copiado — pégalo donde quieras compartirlo'); }
+    catch(e) { showToast(text); }
+  }
+}
+
+/* ══════════════ MODO NIÑOS ══════════════ */
+function toggleKidsMode() {
+  state.kidsMode = !state.kidsMode;
+  applyKidsMode(state.kidsMode, true);
+  saveState();
+}
+function applyKidsMode(on, animate) {
+  document.body.classList.toggle('kids-mode', !!on);
+  const tog = document.getElementById('tog-kids');
+  if (tog) { tog.classList.toggle('on', !!on); tog.setAttribute('aria-checked', !!on); }
+  renderKidsBanner();
+}
+function renderKidsBanner() {
+  const el = document.getElementById('kids-banner');
+  if (!el) return;
+  if (!state.kidsMode) { el.style.display='none'; return; }
+  el.style.display='block';
+  const uv = state.uv ?? 0;
+  const msg = uv>=11 ? '¡Cuidado! El sol está MUY fuerte hoy 🥵🔥 No salgas sin gorra, lentes y bloqueador.' :
+              uv>=8 ? 'El sol está fuerte 😎 ¡Ponte bloqueador y gorra antes de salir!' :
+              uv>=6 ? 'Hay bastante sol ☀️ Usa bloqueador si vas a jugar afuera.' :
+              uv>=3 ? 'El sol está tranquilo hoy 🙂 Igual usa gorra si vas a estar mucho tiempo afuera.' :
+              '¡Puedes jugar afuera tranquilo! 🌤️ Casi no hay sol fuerte.';
+  el.innerHTML = `<div class="kids-mascot">${uv>=8?'🥵':uv>=4?'😎':'🙂'}</div><div class="kids-msg">${msg}</div>`;
+}
+
+/* ══════════════ FARMACIAS CERCANAS (datos reales, OpenStreetMap) ══════════════ */
+function haversineKm(lat1,lon1,lat2,lon2) {
+  const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+async function loadPharmacies() {
+  const el = document.getElementById('pharmacies-list');
+  if (!state.lat) { showToast('Primero permite el acceso a tu ubicación'); return; }
+  el.innerHTML = '<div class="hist-empty">Buscando farmacias cerca de ti...</div>';
+  try {
+    const query = `[out:json][timeout:15];node(around:3000,${state.lat},${state.lon})[amenity=pharmacy];out body 20;`;
+    const r = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+    const d = await r.json();
+    const items = (d.elements || []).map(p => {
+      const tags = p.tags || {};
+      const dist = haversineKm(state.lat, state.lon, p.lat, p.lon);
+      const addr = [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(' ');
+      return { name: tags.name || 'Farmacia (sin nombre registrado)', addr, dist, lat:p.lat, lon:p.lon };
+    }).sort((a,b)=>a.dist-b.dist).slice(0,15);
+
+    if (!items.length) {
+      el.innerHTML = '<div class="hist-empty">No se encontraron farmacias registradas cerca de ti en OpenStreetMap.</div>';
+      return;
+    }
+    el.innerHTML = items.map(p => `
+      <div class="pharmacy-row">
+        <div class="pharmacy-icon">💊</div>
+        <div class="pharmacy-info">
+          <div class="pharmacy-name">${p.name}</div>
+          <div class="pharmacy-sub">${p.addr ? p.addr+' · ' : ''}${p.dist.toFixed(1)} km</div>
+        </div>
+        <a class="pharmacy-go" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}" target="_blank" rel="noopener">Ir ↗</a>
+      </div>`).join('') + '<div class="map-hint" style="text-align:left;margin-top:8px;">Datos de OpenStreetMap, un mapa colaborativo abierto. Puede que falte algún local o algún dato esté desactualizado.</div>';
+  } catch(e) {
+    el.innerHTML = '<div class="hist-empty">⚠️ No se pudieron cargar las farmacias. Intenta de nuevo.</div>';
+  }
 }
 
 /* ── THEME ── */
@@ -876,10 +1072,17 @@ function renderConsejos() {
   ];
 
   wrap.innerHTML = `<div class="card-title" style="padding:4px 4px 0;">💡 Recomendaciones para hoy en ${state.city}</div>` +
-    cards.map(c=>`<div class="consejo-card">
+    cards.map((c,i)=>`<div class="consejo-card">
       <div class="consejo-title"><span aria-hidden="true">${c.icon}</span> ${c.title}</div>
       <div class="consejo-body">${c.body}</div>
-    </div>`).join('');
+    </div>` + (i===0 ? `<div class="sponsor-card sponsor-inline">
+      <div class="sponsor-label">Espacio patrocinado — ejemplo</div>
+      <div class="sponsor-row">
+        <div class="sponsor-icon">🧴</div>
+        <div><div class="sponsor-name">Recomendado por <b>[Marca de protector solar]</b></div>
+        <div class="sponsor-sub">Aquí una marca aliada podría mostrar su producto junto a este consejo.</div></div>
+      </div>
+    </div>` : '')).join('');
 }
 
 /* ══════════════ NOTIFICACIONES REALES ══════════════ */
@@ -973,7 +1176,8 @@ function saveState() {
     unit:state.unit, skinType:state.skinType, accent:state.accent, accentGrad:state.accentGrad,
     accentName:state.accentName, theme:state.theme, fontSize:state.fontSize, accounts:state.accounts,
     alerts:state.alerts, toggles:state.toggles, history:state.history, alertLog:state.alertLog,
-    lastNotified:state.lastNotified, community:state.community, reminders:state.reminders
+    lastNotified:state.lastNotified, community:state.community, reminders:state.reminders,
+    compareCities:state.compareCities, emergencyPhone:state.emergencyPhone, kidsMode:state.kidsMode
   }));}catch(e){}
 }
 function loadState() {
@@ -994,6 +1198,9 @@ function loadState() {
     if(s.lastNotified) state.lastNotified=s.lastNotified;
     if(s.community) state.community=s.community;
     if(s.reminders) state.reminders=s.reminders;
+    if(s.compareCities) state.compareCities=s.compareCities;
+    if(s.emergencyPhone) state.emergencyPhone=s.emergencyPhone;
+    if(typeof s.kidsMode==='boolean') state.kidsMode=s.kidsMode;
     if(s.accounts?.[0]){
       const av=document.getElementById('avatar-el');
       const nm=document.getElementById('profile-name-el');

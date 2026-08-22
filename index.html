@@ -24,6 +24,12 @@
     <div class="fx-cloud fx-cloud1"></div>
     <div class="fx-cloud fx-cloud2"></div>
     <div class="fx-cloud fx-cloud3"></div>
+    <div class="fx-star" style="top:8%;left:15%;"></div>
+    <div class="fx-star" style="top:14%;left:60%;animation-delay:.6s;"></div>
+    <div class="fx-star" style="top:22%;left:35%;animation-delay:1.1s;"></div>
+    <div class="fx-star" style="top:30%;left:80%;animation-delay:1.6s;"></div>
+    <div class="fx-star" style="top:6%;left:85%;animation-delay:.3s;"></div>
+    <div class="fx-star" style="top:38%;left:10%;animation-delay:2s;"></div>
   </div>
 
   <!-- SPLASH -->
@@ -59,6 +65,7 @@
 
     <!-- HOME -->
     <div id="screen-home" class="screen active">
+      <div id="kids-banner" class="kids-banner" style="display:none;"></div>
       <div class="dashboard-grid">
 
         <div class="left-col">
@@ -146,12 +153,39 @@
             <div class="rec-box" id="rec-box">Cargando...</div>
             <button class="btn-action" onclick="goTo('consejos')">↗ Plan de protección</button>
           </div>
+          <div class="card" id="emergency-card" style="display:none;border:1.5px solid #C62828;">
+            <div class="card-title">🚨 UV extremo — avisa a tu familia</div>
+            <p style="font-size:12px;color:var(--text2);margin:0 0 8px;">El nivel de radiación es peligroso. Puedes avisarle a tu contacto de emergencia con un mensaje ya escrito.</p>
+            <button class="btn-action" style="background:#25D366" onclick="sendWhatsAppAlert()">📲 Avisar por WhatsApp</button>
+          </div>
+
+          <div class="card">
+            <div class="card-title">📤 Comparte tu reporte</div>
+            <p style="font-size:12px;color:var(--text2);margin:0 0 8px;">Comparte el índice UV de ahora en tus redes o con quien quieras.</p>
+            <button class="btn-action" onclick="shareReport()">📤 Compartir reporte</button>
+          </div>
         </div>
 
       </div>
     </div>
 
-    <!-- MAPA -->
+    <!-- COMPARAR CIUDADES -->
+    <div id="screen-comparar" class="screen">
+      <div class="hist-wrap">
+        <div class="card">
+          <div class="card-title">🏙️ Comparar UV entre ciudades</div>
+          <div class="reminder-form">
+            <input type="text" id="compare-input" class="reminder-input" placeholder="Buscar ciudad (ej. Lima, Cusco...)" onkeydown="if(event.key==='Enter')searchCompareCity()"/>
+            <button class="btn-action" style="max-width:90px;margin:0" onclick="searchCompareCity()">Buscar</button>
+          </div>
+          <div id="compare-suggestions"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 Ciudades comparadas</div>
+          <div id="compare-list"></div>
+        </div>
+      </div>
+    </div>
     <div id="screen-mapa" class="screen">
       <div class="map-wrap">
         <div class="card" style="padding:12px 14px 14px;">
@@ -229,6 +263,10 @@
         <div class="card" style="padding:0;overflow:hidden;">
           <div class="sky-view" id="sky-view">
             <div class="sky-sun-moon" id="sky-body">☀️</div>
+            <div class="sky-star" style="top:10%;left:20%;"></div>
+            <div class="sky-star" style="top:16%;left:50%;animation-delay:.5s;"></div>
+            <div class="sky-star" style="top:8%;left:75%;animation-delay:1s;"></div>
+            <div class="sky-star" style="top:24%;left:65%;animation-delay:1.4s;"></div>
             <div class="sky-cloud sky-cloud-a"></div>
             <div class="sky-cloud sky-cloud-b"></div>
             <div class="sky-cloud sky-cloud-c"></div>
@@ -320,6 +358,20 @@
       </div>
     </div>
 
+    <!-- FARMACIAS CERCANAS -->
+    <div id="screen-farmacias" class="screen">
+      <div class="hist-wrap">
+        <div class="card">
+          <div class="card-title">💊 Farmacias cercanas</div>
+          <p style="font-size:12px;color:var(--text2);margin:0 0 4px;">Directorio de farmacias reales cerca de ti, útil para comprar protector solar. No son patrocinadores, solo información de ubicación.</p>
+          <button class="btn-action" onclick="loadPharmacies()">🔄 Buscar cerca de mí</button>
+        </div>
+        <div class="card">
+          <div id="pharmacies-list"><div class="hist-empty">Toca "Buscar cerca de mí" para ver farmacias en tu zona.</div></div>
+        </div>
+      </div>
+    </div>
+
     <!-- CONSEJOS -->
     <div id="screen-consejos" class="screen">
       <div class="hist-wrap" id="consejos-wrap">
@@ -364,6 +416,52 @@
     <!-- AJUSTES -->
     <div id="screen-ajustes" class="screen">
       <div class="profile-body" style="padding-top:14px;">
+
+        <div class="sec-label">💎 SolarAlert Premium</div>
+        <div class="pcard premium-card">
+          <div class="premium-head">
+            <div class="premium-badge">✨ Sin anuncios + funciones extra</div>
+            <p class="premium-copy">Historial ilimitado, estadísticas avanzadas y recordatorios ilimitados.</p>
+          </div>
+          <div class="premium-plans">
+            <div class="plan-btn" id="plan-monthly" onclick="selectPlan('monthly')">
+              <div class="plan-name">Mensual</div>
+              <div class="plan-price">S/ 4.90<span>/mes</span></div>
+            </div>
+            <div class="plan-btn recommended" id="plan-yearly" onclick="selectPlan('yearly')">
+              <div class="plan-tag">Ahorra 32%</div>
+              <div class="plan-name">Anual</div>
+              <div class="plan-price">S/ 39.90<span>/año</span></div>
+            </div>
+          </div>
+          <button class="btn-action" onclick="activatePremium()">💎 Probar Premium</button>
+          <div class="map-hint" style="text-align:left;margin-top:8px;">Esto es una simulación para la presentación del proyecto — en la versión real se conectaría a Google Play Billing o a Yape/Plin.</div>
+        </div>
+
+        <div class="sec-label">🤝 Alianza con marcas</div>
+        <div class="pcard sponsor-card">
+          <div class="sponsor-label">Espacio patrocinado — ejemplo</div>
+          <div class="sponsor-row">
+            <div class="sponsor-icon">🧴</div>
+            <div>
+              <div class="sponsor-name">Recomendado por <b>[Marca de protector solar]</b></div>
+              <div class="sponsor-sub">Así se vería un espacio pagado por una marca aliada dentro de la app.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec-label">🧒 Modo niños</div>
+        <div class="pcard">
+          <div class="prow"><div class="prow-icon" style="background:#FCE4EC">🧒</div><div class="prow-label">Interfaz simple y colorida<span class="prow-sub">Textos amigables, íconos más grandes</span></div><div class="toggle" id="tog-kids" role="switch" aria-checked="false" tabindex="0" aria-label="Modo niños" onclick="toggleKidsMode()"></div></div>
+        </div>
+
+        <div class="sec-label">🚨 Contacto de emergencia</div>
+        <div class="pcard">
+          <div style="padding:12px 14px;">
+            <input type="tel" id="emergency-phone" class="reminder-input" style="width:100%;" placeholder="Ej: 51987654321 (con código de país)" onchange="saveEmergencyContact()"/>
+            <div class="map-hint" style="text-align:left;margin-top:6px;">Si el UV llega a nivel extremo, te mostraremos un botón para avisarle por WhatsApp (tú confirmas el envío).</div>
+          </div>
+        </div>
 
         <div class="sec-label">🌗 Tema de la app</div>
         <div class="pcard">
@@ -455,6 +553,11 @@
         <span class="nav-icon" aria-hidden="true">⏰</span>
         <span class="nav-label">Avisos</span>
       </button>
+      <button class="nav-btn" id="nav-comparar" onclick="goTo('comparar')">
+        <span class="nav-bump" style="background:#00897B"></span>
+        <span class="nav-icon" aria-hidden="true">🏙️</span>
+        <span class="nav-label">Comparar</span>
+      </button>
       <button class="nav-btn" id="nav-estadisticas" onclick="goTo('estadisticas')">
         <span class="nav-bump" style="background:#8D6E63"></span>
         <span class="nav-icon" aria-hidden="true">📊</span>
@@ -464,6 +567,11 @@
         <span class="nav-bump" style="background:#7B4397"></span>
         <span class="nav-icon" aria-hidden="true">📋</span>
         <span class="nav-label">Historial</span>
+      </button>
+      <button class="nav-btn" id="nav-farmacias" onclick="goTo('farmacias')">
+        <span class="nav-bump" style="background:#00B0FF"></span>
+        <span class="nav-icon" aria-hidden="true">💊</span>
+        <span class="nav-label">Farmacias</span>
       </button>
       <button class="nav-btn" id="nav-consejos" onclick="goTo('consejos')">
         <span class="nav-bump" style="background:#43A047"></span>
